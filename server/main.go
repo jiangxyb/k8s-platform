@@ -22,7 +22,13 @@ func main() {
 	global.GVA_VP = core.Viper()      // 初始化Viper
 	global.GVA_LOG = core.Zap()       // 初始化zap日志库
 	global.GVA_DB = initialize.Gorm() // gorm连接数据库
-	initialize.Kubernetes()			  // 初始化K8s连接
+	initialize.Kubernetes()           // 初始化K8s连接
+	initialize.Deployment()
+	//time.Sleep(time.Second*5)
+	//d, _ := v1.GetDeploymentByWatch("default","ngx")
+
+	//v1.GetRSByDeployment("default",d)
+	//return
 	initialize.Timer()
 	if global.GVA_DB != nil {
 		initialize.MysqlTables(global.GVA_DB) // 初始化表

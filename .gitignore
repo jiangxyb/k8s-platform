@@ -3,3 +3,6 @@ web/node_modules
 server/*.json
 server/config.yaml
 server/ngx.yaml
+server/test.go
+server/test
+server/log

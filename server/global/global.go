@@ -3,6 +3,7 @@ package global
 import (
 	"gin-vue-admin/utils/timer"
 	"k8s.io/client-go/kubernetes"
+	"sync"
 
 	"golang.org/x/sync/singleflight"
 
@@ -24,5 +25,9 @@ var (
 	GVA_LOG                 *zap.Logger
 	GVA_Timer               timer.Timer = timer.NewTimerTask()
 	GVA_Concurrency_Control             = &singleflight.Group{}
-	ClientSet *kubernetes.Clientset
+	ClientSet               *kubernetes.Clientset
+	// key: name of namespace,value: []*v1.Deployment
+	DeployMap sync.Map
+	PodMap    PodMapStruct //作为全局对象
+	RsMap     RsMapStruct
 )

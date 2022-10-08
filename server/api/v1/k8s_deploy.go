@@ -6,30 +6,32 @@ import (
 	"gin-vue-admin/global"
 	"gin-vue-admin/model/response"
 	"github.com/gin-gonic/gin"
+	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 )
 
 func GetDeployList(ctx *gin.Context) {
-	c := context.Background()
-	listopt := metav1.ListOptions{}
-	deployList, _ := global.ClientSet.AppsV1().Deployments("default").List(c, listopt)
+	deploys, _ := DeploysByNS("default")
+	deployList := Deployments{
+		Items: deploys,
+	}
 
-	ctx.JSON(http.StatusOK, &deployList)
+	ctx.JSON(http.StatusOK, deployList)
 }
 
 func GetDeploymentDetail(ctx *gin.Context) {
 	name := ctx.Param("name")
 	fmt.Println(name)
-	detail := GetDeployment("default", name)
+	detail, _ := GetDeploymentByWatch("default", name)
 
 	iNames := make([]string, 0)
 	for _, v := range detail.Spec.Template.Spec.Containers {
 		iNames = append(iNames, v.Image)
 	}
 	podList := GetPodsByDeploy("default", detail)
-	pods := make([]*Pod, len(podList.Items))
-	for i, item := range podList.Items {
+	pods := make([]*Pod, len(podList))
+	for i, item := range podList {
 		pods[i] = &Pod{
 			Name:       item.Name,
 			Images:     GetImagesByContainers(item.Spec.Containers),
@@ -58,18 +60,22 @@ func IncReplica(ctx *gin.Context) {
 		panic(err)
 	}
 	opt := metav1.GetOptions{}
-	scale,_ := global.ClientSet.AppsV1().Deployments(req.NameSpace).GetScale(context.Background(),req.Deploy,opt)
+	scale, _ := global.ClientSet.AppsV1().Deployments(req.NameSpace).GetScale(context.Background(), req.Deploy, opt)
 	if req.Dec {
 		scale.Spec.Replicas -= 1
-	}else {
+	} else {
 		scale.Spec.Replicas += 1
 	}
-	opts :=  metav1.UpdateOptions{}
-	_,err = global.ClientSet.AppsV1().Deployments(req.NameSpace).UpdateScale(context.Background(),req.Deploy,scale,opts)
+	opts := metav1.UpdateOptions{}
+	_, err = global.ClientSet.AppsV1().Deployments(req.NameSpace).UpdateScale(context.Background(), req.Deploy, scale, opts)
 	if err != nil {
 		panic(err)
 	}
 	response.Ok(ctx)
+}
+
+type Deployments struct {
+	Items []*v1.Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 type ReqReplica struct {
