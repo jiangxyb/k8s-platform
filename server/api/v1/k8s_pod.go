@@ -11,6 +11,13 @@ import (
 func GetPods(ctx *gin.Context) {
 	c := context.Background()
 	opt := metav1.ListOptions{}
-	podList,_ := global.ClientSet.CoreV1().Pods("default").List(c,opt)
-	ctx.JSON(http.StatusOK,&podList)
+	podList, _ := global.ClientSet.CoreV1().Pods("default").List(c, opt)
+	ctx.JSON(http.StatusOK, &podList)
+}
+
+func GetPodJson(ctx *gin.Context) {
+	ns := ctx.DefaultQuery("ns", "default")
+	podName := ctx.DefaultQuery("pod", "default")
+	pod := global.PodMap.Get(ns, podName)
+	ctx.JSON(http.StatusOK, &pod)
 }

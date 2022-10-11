@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"gin-vue-admin/global"
+	"gin-vue-admin/model"
 	"gin-vue-admin/model/response"
 	"github.com/gin-gonic/gin"
-	v1 "k8s.io/api/apps/v1"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 )
 
 func GetDeployList(ctx *gin.Context) {
 	deploys, _ := DeploysByNS("default")
-	deployList := Deployments{
+	deployList := model.Deployments{
 		Items: deploys,
 	}
 
@@ -30,13 +31,26 @@ func GetDeploymentDetail(ctx *gin.Context) {
 		iNames = append(iNames, v.Image)
 	}
 	podList := GetPodsByDeploy("default", detail)
-	pods := make([]*Pod, len(podList))
-	for i, item := range podList {
-		pods[i] = &Pod{
-			Name:       item.Name,
-			Images:     GetImagesByContainers(item.Spec.Containers),
-			NodeName:   item.Spec.NodeName,
-			CreateTime: item.CreationTimestamp.Format("2006-01-02 15:04:05"),
+	pods := make([]*model.Pod, len(podList))
+	msg := ""
+	for i, pod := range podList {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Status != "True" {
+				msg = fmt.Sprintf("%v,%v", condition.Reason, condition.Message)
+				break
+			}
+		}
+		pods[i] = &model.Pod{
+			Name:         pod.Name,
+			Ns:           pod.Namespace,
+			Images:       GetImagesByContainers(pod.Spec.Containers),
+			NodeName:     pod.Spec.NodeName,
+			CreateTime:   pod.CreationTimestamp.Format("2006-01-02 15:04:05"),
+			Phase:        string(pod.Status.Phase),
+			Message:      msg,
+			EventMsg:     global.EventMap.GetMessage("default", "Pod", pod.Name),
+			RestartCount: pod.Status.ContainerStatuses[0].RestartCount,
+			Ready:        GetPodIsReady(pod),
 		}
 	}
 
@@ -44,7 +58,7 @@ func GetDeploymentDetail(ctx *gin.Context) {
 	replicas[0] = *detail.Spec.Replicas
 	replicas[1] = detail.Status.AvailableReplicas
 	replicas[2] = detail.Status.UnavailableReplicas
-	deployDetail := DeployDetail{
+	deployDetail := model.DeployDetail{
 		Name:       detail.Name,
 		ImageNames: iNames,
 		Replicas:   replicas,
@@ -54,7 +68,7 @@ func GetDeploymentDetail(ctx *gin.Context) {
 }
 
 func IncReplica(ctx *gin.Context) {
-	req := ReqReplica{}
+	req := model.ReqReplica{}
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		panic(err)
@@ -74,26 +88,14 @@ func IncReplica(ctx *gin.Context) {
 	response.Ok(ctx)
 }
 
-type Deployments struct {
-	Items []*v1.Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-type ReqReplica struct {
-	NameSpace string `json:"ns"`
-	Deploy    string `json:"deploy"`
-	Dec       bool   `json:"dec"`
-}
-
-type DeployDetail struct {
-	Name       string   `json:"name"`
-	ImageNames []string `json:"images_name"`
-	Replicas   []int32  `json:"replicas"` // index表示表示不同的含义，0 总，1 可用，2 不可用
-	Pods       []*Pod   `json:"pods"`
-}
-
-type Pod struct {
-	Name       string   `json:"name"`
-	Images     []string `json:"images"`
-	NodeName   string   `json:"node_name"`
-	CreateTime string   `json:"create_time"`
+func DeleteDeployment(ctx *gin.Context) {
+	ns := ctx.DefaultQuery("ns", "default")
+	deploy := ctx.Query("deploy")
+	err := global.ClientSet.AppsV1().Deployments(ns).Delete(context.Background(), deploy, metav1.DeleteOptions{})
+	if err != nil {
+		global.GVA_LOG.Error("删除deployment失败!", zap.Any("err", err))
+		response.FailWithMessage("删除deployment失败", ctx)
+		return
+	}
+	response.Ok(ctx)
 }

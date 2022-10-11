@@ -52,24 +52,34 @@ func (this *PodMapStruct) Delete(pod *corev1.Pod) {
 	}
 }
 
-//根据标签获取 POD列表
-func (this *PodMapStruct) ListByLabels(ns string, labels map[string]string) ([]*corev1.Pod, error) {
-	ret := make([]*corev1.Pod, 0)
-	l, o := this.data.Load(ns)
-	fmt.Println("是否Ok:", o)
-	fmt.Println("pod数量：", fmt.Sprint(len(l.([]*corev1.Pod))))
+func (this *PodMapStruct) Get(ns string, podName string) *corev1.Pod {
 	if list, ok := this.data.Load(ns); ok {
 		for _, pod := range list.([]*corev1.Pod) {
-			fmt.Println("pod标签：", pod.Labels)
-			isMatchedPod := true
-			for k, v := range labels {
-				if value, ok := pod.Labels[k]; !ok || value != v {
-					isMatchedPod = false
-					break
-				}
+			if pod.Name == podName {
+				return pod
 			}
-			if isMatchedPod {
-				ret = append(ret, pod)
+		}
+	}
+	return nil
+}
+
+//根据多个rs的标签获取 POD列表
+func (this *PodMapStruct) ListByLabels(ns string, labels []map[string]string) ([]*corev1.Pod, error) {
+	ret := make([]*corev1.Pod, 0)
+	if list, ok := this.data.Load(ns); ok {
+		for _, pod := range list.([]*corev1.Pod) {
+			for _, l := range labels {
+				isMatchedPod := true
+				for k, v := range l {
+					if value, ok := pod.Labels[k]; !ok || value != v {
+						isMatchedPod = false
+						break
+					}
+				}
+				if isMatchedPod {
+					ret = append(ret, pod)
+				}
+
 			}
 		}
 		return ret, nil
@@ -119,4 +129,26 @@ func (this *RsMapStruct) ListByNameSpace(ns string) ([]*appv1.ReplicaSet, error)
 		return list.([]*appv1.ReplicaSet), nil
 	}
 	return nil, fmt.Errorf("pods not found ")
+}
+
+type EventMapStruct struct {
+	data sync.Map // value=> *v1.Event
+	// key=>namespace+"_"+kind+"_"+name 这里的name 不一定是pod
+}
+
+func (this *EventMapStruct) GetMessage(ns string, kind string, name string) string {
+	key := fmt.Sprintf("%s_%s_%s", ns, kind, name)
+	if v, ok := this.data.Load(key); ok {
+		return v.(*corev1.Event).Message
+	}
+
+	return ""
+}
+
+func (this *EventMapStruct) Store(key string, event *corev1.Event) {
+	this.data.Store(key, event)
+}
+
+func (this *EventMapStruct) Delete(key string) {
+	this.data.Delete(key)
 }

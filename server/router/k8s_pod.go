@@ -8,8 +8,8 @@ import (
 func InitPodRouter(Router *gin.RouterGroup) (R gin.IRoutes) {
 	podRouter := Router.Group("pod")
 	{
-		podRouter.GET("/list",v1.GetPods)
-
+		podRouter.GET("/list", v1.GetPods)
+		podRouter.GET("/json", v1.GetPodJson)
 	}
 	return podRouter
 }

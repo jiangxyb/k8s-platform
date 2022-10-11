@@ -30,4 +30,5 @@ var (
 	DeployMap sync.Map
 	PodMap    PodMapStruct //作为全局对象
 	RsMap     RsMapStruct
+	EventMap  EventMapStruct
 )

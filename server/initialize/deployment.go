@@ -19,6 +19,7 @@ func Deployment() {
 
 	pod()
 	replicaset()
+	events()
 
 	fact.Start(wait.NeverStop)
 }

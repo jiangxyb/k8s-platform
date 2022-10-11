@@ -38,11 +38,24 @@ func DeploysByNS(ns string) ([]*v1.Deployment, error) {
 
 func GetPodsByDeploy(ns string, deploy *v1.Deployment) []*corev1.Pod {
 	rs, _ := GetRSByDeploymentWithWatch(ns, deploy)
-	labels, _ := metav1.LabelSelectorAsMap(rs.Spec.Selector)
+	labels, _ := GetRsListLabel(rs)
 	fmt.Println(labels)
 	podList, _ := global.PodMap.ListByLabels(ns, labels)
 	fmt.Println(len(podList))
 	return podList
+}
+
+func GetRsListLabel(rslist []*v1.ReplicaSet) ([]map[string]string, error) {
+
+	ret := make([]map[string]string, 0)
+	for _, item := range rslist {
+		s, err := metav1.LabelSelectorAsMap(item.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, s)
+	}
+	return ret, nil
 }
 
 func GetLabelSelectorByDeploy(deploy *v1.Deployment) string {
@@ -95,23 +108,27 @@ func GetRSByDeployment(ns string, dep *v1.Deployment) (*v1.ReplicaSet, error) {
 }
 
 // ns下要有这个deployment才能获取到rs
-func GetRSByDeploymentWithWatch(ns string, dep *v1.Deployment) (*v1.ReplicaSet, error) {
+func GetRSByDeploymentWithWatch(ns string, dep *v1.Deployment) ([]*v1.ReplicaSet, error) {
 	RSList, err := global.RsMap.ListByNameSpace(ns)
 	if err != nil {
 		log.Println(err)
 	}
-	// 用注解和依赖资源筛选
+
+	ret := make([]*v1.ReplicaSet, 0)
 	for _, rs := range RSList {
-		if IsCurrentRsByDep(dep, rs) {
-			return rs, nil
+		if IsRsOfDep(dep, rs) {
+			ret = append(ret, rs)
 		}
+	}
+	if len(ret) != 0 {
+		return ret, nil
 	}
 	return nil, errors.New("not found")
 }
 
 func GetRsLabelByDeployment(dep *v1.Deployment, rslist []*v1.ReplicaSet) (map[string]string, error) {
 	for _, item := range rslist {
-		if IsCurrentRsByDep(dep, item) {
+		if IsRsOfDep(dep, item) {
 			s, err := metav1.LabelSelectorAsMap(item.Spec.Selector)
 			if err != nil {
 				return nil, err
@@ -120,6 +137,16 @@ func GetRsLabelByDeployment(dep *v1.Deployment, rslist []*v1.ReplicaSet) (map[st
 		}
 	}
 	return nil, nil
+}
+
+//判断 rs 是否属于 某个 dep
+func IsRsOfDep(dep *v1.Deployment, set *v1.ReplicaSet) bool {
+	for _, ref := range set.OwnerReferences {
+		if ref.Kind == "Deployment" && ref.Name == dep.Name {
+			return true
+		}
+	}
+	return false
 }
 
 // 用注解和依赖资源筛选
@@ -133,4 +160,21 @@ func IsCurrentRsByDep(dep *v1.Deployment, rs *v1.ReplicaSet) bool {
 		}
 	}
 	return false
+}
+
+//判断POD是否就绪
+func GetPodIsReady(pod *corev1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == "ContainersReady" && condition.Status != "True" {
+			return false
+		}
+	}
+	for _, rg := range pod.Spec.ReadinessGates {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == rg.ConditionType && condition.Status != "True" {
+				return false
+			}
+		}
+	}
+	return true
 }
