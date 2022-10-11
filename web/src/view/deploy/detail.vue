@@ -31,6 +31,14 @@
         </template>
 
       </el-table-column>
+      <el-table-column
+        prop="replicas"
+        label="删除"
+      >
+        <template slot-scope="t">
+          <el-button size="mini" type="success" @click="deleteDeploy(t.row)">Delete</el-button>
+        </template>
+      </el-table-column>>
     </el-table>
     <div style="height:30px;" />
     <!--   -------------------------------------------------------------------------- -->
@@ -41,9 +49,24 @@
       style="width: 100%"
     >
       <el-table-column
+        prop="phase"
+        label="阶段"
+      >
+        <template slot-scope="{row}">
+          <p>{{ row.phase }}</p>
+          <span class="red">{{ row.message }}</span>
+        </template>
+      </el-table-column>>
+
+      <el-table-column
         prop="name"
         label="Pod名称"
-      />
+      >
+        <template slot-scope="{row}">
+          <p>{{ row.name }}</p>
+          <span v-show="!row.ready" class="red">{{ row.event_msg }}</span>
+        </template>
+      </el-table-column>>
       <el-table-column
         prop="images"
         label="镜像"
@@ -60,6 +83,18 @@
         prop="create_time"
         label="创建时间"
       />
+      <el-table-column
+        prop="restart_count"
+        label="RESTARTS"
+      />
+      <el-table-column
+        prop=""
+        label="获取json"
+      >
+        <template slot-scope="scope">
+          <el-button size="mini" type="success" @click="toPodjson(scope.row)">Get json</el-button>
+        </template>
+      </el-table-column>>
     </el-table>
   </div>
 </template>
@@ -70,6 +105,7 @@ import { store } from '@/store'
 const token = store.getters['user/token']
 const user = store.getters['user/userInfo']
 const path = process.env.VUE_APP_BASE_API
+let timer = null
 
 // import { useRoute } from 'vue-router'
 // const route = useRoute()
@@ -82,7 +118,8 @@ export default {
       name: '',
       backData: {},
       my: [],
-      a: 'skhfk'
+      a: 'skhfk',
+      ns: ''
     }
   },
   computed: {},
@@ -90,11 +127,48 @@ export default {
     console.log('启动')
     this.setName()
     this.getDeployDetail()
+    this.setTimer()
   },
   mounted() {
 
   },
   methods: {
+    toPodjson(row) {
+      this.$router.push({
+        name: 'podjson',
+        params: {
+        },
+        query: {
+          ns: row.ns,
+          pod: row.name
+        }
+      })
+    },
+    deleteDeploy(row) {
+      console.log(row.ns)
+      return this.axios.delete(path + '/kubernetes/deploy/delete?' + 'ns=' + this.pods[0].ns + '&deploy=' + this.name, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-token': token,
+          'x-user-id': user.ID
+        }
+      })
+        .then(rsp => {
+          this.backData = rsp.data
+          this.tableData = [{
+            name: '',
+            images_name: [
+              '',
+              ''
+            ],
+            replicas: 0,
+            pods: [{ name: 'shfk' }, { name: 'shfk' }]
+          }]
+          this.tableData[0] = rsp.data
+          this.pods = rsp.data.pods
+          console.log(this.tableData)
+        })
+    },
     setName() {
       this.name = this.$route.query.name
     },
@@ -131,6 +205,39 @@ export default {
           console.log(this.tableData)
         })
     },
+    setTimer() {
+      // eslint-disable-next-line no-undef
+      this.axios.get(path + '/kubernetes/deploy/' + this.name, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-token': token,
+          'x-user-id': user.ID
+        }
+      }).then(rsp => {
+        this.backData = rsp.data
+        this.tableData = [{
+          name: '',
+          images_name: [
+            '',
+            ''
+          ],
+          replicas: 0,
+          pods: [{ name: 'shfk' }, { name: 'shfk' }]
+        }]
+        this.tableData[0] = rsp.data
+        this.pods = rsp.data.pods
+        console.log(this.tableData)
+        // eslint-disable-next-line no-constant-condition
+        if (this.pods.length !== this.tableData.replicas) { // 根据返回状态判断
+          timer = setTimeout(() => {
+            this.setTimer()
+          }, 2000)// 2秒查一下
+        } else {
+          clearTimeout(timer)// 清理定时任务
+        }
+      })
+    },
+
     cellStyle({ row, column, rowIndex, columnIndex }) {
       if (columnIndex === 5) { // 指定坐标rowIndex ：行，columnIndex ：列
         return 'color: red' // rgb(105,0,7)
@@ -165,7 +272,6 @@ export default {
         }
       })
         .then(rsp => {
-          this.getDeployDetail()
           console.log(rsp)
         })
     }

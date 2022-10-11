@@ -32,8 +32,8 @@
         label="副本数"
       >
         <el-table-column
-          prop="status.replicas"
-          label="sum"
+          prop="spec.replicas"
+          label="期望"
           width="80"
         />
         <el-table-column

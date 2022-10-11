@@ -21,7 +21,7 @@ Vue.use(APlayer, {
 Vue.use(uploader)
 
 console.log(`
-   欢迎使用 Gin-Vue-Admin
+   欢迎使用 k8s-platform
    当前版本:V2.4.3
    加群方式:微信：shouzi_1994 QQ群：622360840
    默认自动化文档地址:http://127.0.0.1:${process.env.VUE_APP_SERVER_PORT}/swagger/index.html
