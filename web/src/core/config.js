@@ -3,7 +3,8 @@
  */
 
 const config = {
-  appName: 'k8s-platform',
+  appName: 'K8s-Platform',
+  appPowered: 'Gin-Vue-Admin',
   appLogo: 'https://www.gin-vue-admin.com/img/logo.png'
 }
 

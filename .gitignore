@@ -6,3 +6,4 @@ server/ngx.yaml
 server/test.go
 server/test
 server/log
+*_test.go
